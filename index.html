@@ -94,6 +94,15 @@ nav button.on{color:var(--gold)}
 const K='lifepath17ba';
 const QUARTER={name:'Q3 2026 · ROOTS',end:'2026-09-25',goal:75000,
   miles:[['Jul 25',25000],['Aug 25',50000],['Sep 25',75000]],evolve:'2026-09-27'};
+const DAILY=[
+ ['Sunday Review — 30 min (use the Notes template)','Money check: on pace for the 25th target?','Pick Saturday\'s ONE thing + this week\'s build goal','Log any weekend spending in Budget','Write Monday\'s first move as a task'],
+ ['Downtime · AI course/YouTube 30 min — write 1 takeaway','Downtime · 1 prompting rep: build something small with Claude','Log every expense in Budget','6:45–9pm · AI/Dev BUILD block — the monthly ship','Shutdown note: where you stopped + tomorrow\'s first move'],
+ ['Downtime · Trading/market study 30 min — 1 note','Downtime · draft 2 content ideas for Bad Apple','Log every expense in Budget','6:45–9pm · BOTS night — backtest / demo check + EA notes','Record demo results (numbers or screenshot) in Notes'],
+ ['Downtime · AI course/YouTube 30 min — write 1 takeaway','Downtime · 1 prompting rep with Claude','Log every expense in Budget','6:45–9pm · AI/Dev BUILD block — continue Monday\'s work','Shutdown note: where you stopped + next step'],
+ ['Downtime · Trading/market study 30 min','Downtime · content ideas / brand thinking for Bad Apple','Log every expense in Budget','6:45–9pm · BRAND night — waitlist, designs, site (free work only)','Quick bots check: demo running clean?'],
+ ['Downtime · free study — pick any lane, 30 min','Log every expense in Budget','Finish anything half-done from the week (light)','Plan Saturday\'s Big Block — ONE thing, written down','Evening OFF — guilt-free'],
+ ['9am–1pm · BIG BLOCK — this week\'s ONE thing','Log every expense in Budget','Note what got DONE (Sunday Review reads this)','Bots check: demo running clean?']];
+const PAYDAY_TASKS=['PAYDAY · transfer savings FIRST (before anything else)','PAYDAY · log the deposit on Home','PAYDAY · pay fixed bills + screenshot the balance'];
 const ROUTINE=['Sunday Review — 30 min. Money check, wins, pick Saturday\'s ONE thing.',
   'AI / Dev Skill night — 6:45–9pm. Build, don\'t just watch.',
   'Bad Apple night — Bots. Backtests, demo monitoring, EA notes.',
@@ -101,7 +110,7 @@ const ROUTINE=['Sunday Review — 30 min. Money check, wins, pick Saturday\'s ON
   'Bad Apple night — Brand. Content, waitlist, Drop 001 prep (free work only).',
   'OFF / catch-up. Guilt-free either way.',
   'BIG BLOCK 9am–1pm. This week\'s ONE thing. Then live your life.'];
-const DEFAULT={savings:[],spend:[],todos:[],notes:[],events:{},
+const DEFAULT={savings:[],spend:[],todos:[],notes:[],events:{},daily:{date:'',items:[]},streak:{last:'',n:0},
   budget:{income:125000,cats:[{n:'Rent',p:0},{n:'Light',p:0},{n:'Water',p:0},{n:'Taxi',p:0},{n:'Internet',p:0},{n:'Subscriptions',p:0},{n:'Computer Loan',p:0},{n:'Food',p:0},{n:'Me Money',p:10000}]},seeded:0};
 const clone=o=>JSON.parse(JSON.stringify(o));
 // Sandboxed viewers (in-app previews) block localStorage — fall back to memory so the app still runs.
@@ -143,7 +152,19 @@ const TABS=[
  ['notes','Notes','<path d="M5 3h11l3 3v15H5z"/><path d="M9 9h6M9 13h6M9 17h4"/>']];
 function renderNav(){$('nav').innerHTML=TABS.map(([id,l,svg])=>
  `<button data-act="tab" data-id="${id}" class="${tab===id?'on':''}"><svg viewBox="0 0 24 24">${svg}</svg>${l}</button>`).join('')}
-function render(){renderNav();({home,budget,tasks,cal:calendar,notes}[tab])()}
+function ensureDaily(){
+ const t=today();if(S.daily&&S.daily.date===t)return;
+ const now=new Date(),list=DAILY[now.getDay()].slice();
+ if(now.getDate()===25)list.unshift.apply(list,PAYDAY_TASKS);
+ S.daily={date:t,items:list.map(x=>({t:x,done:false}))};save();
+}
+function dailyDone(){return S.daily.items.filter(i=>i.done).length}
+function bumpStreak(){
+ if(dailyDone()!==S.daily.items.length||S.streak.last===S.daily.date)return;
+ const y=fmt(new Date(Date.now()-864e5));
+ S.streak.n=S.streak.last===y?S.streak.n+1:1;S.streak.last=S.daily.date;
+}
+function render(){ensureDaily();renderNav();({home,budget,tasks,cal:calendar,notes}[tab])()}
 
 /* ---------- HOME ---------- */
 function home(){
@@ -168,7 +189,8 @@ function home(){
  <div class="card">
   <div style="font-size:.92rem;line-height:1.5">${ROUTINE[now.getDay()]}</div>
   ${ev.length?`<div style="margin-top:10px;font-size:.82rem" class="gold">📌 ${ev.map(esc).join(' · ')}</div>`:''}
-  <div class="row" style="margin-top:12px;font-size:.8rem"><span class="dim">Tasks: ${doneToday} done · ${open.length} open</span><button class="btn ghost sm" data-act="tab" data-id="tasks">Open list →</button></div>
+  <div class="bar"><i style="width:${S.daily.items.length?dailyDone()/S.daily.items.length*100:0}%"></i></div>
+  <div class="row" style="font-size:.8rem"><span class="dim">Daily: ${dailyDone()}/${S.daily.items.length}${S.streak.n?` · 🔥 ${S.streak.n}`:''} · To-dos open: ${open.length}</span><button class="btn ghost sm" data-act="tab" data-id="tasks">Open list →</button></div>
  </div>
  <h2>This month's money</h2>
  <div class="card">
@@ -220,9 +242,17 @@ function budget(){
 /* ---------- TASKS ---------- */
 function tasks(){
  const open=S.todos.filter(t=>!t.done),done=S.todos.filter(t=>t.done).sort((a,b)=>(b.doneAt||'').localeCompare(a.doneAt||''));
+ const dd=dailyDone(),dn=S.daily.items.length,allClear=dd===dn;
  $('view').innerHTML=`
+ <h2 class="row" style="margin-top:4px">Daily routine · ${dd}/${dn}<span class="${S.streak.n?'gold':'faint'}" style="letter-spacing:0;font-size:.72rem">🔥 ${S.streak.n}-day streak</span></h2>
+ <div class="card" ${allClear?'style="border-color:#FBBF2455"':''}>
+  ${S.daily.items.map((it,i)=>`
+   <div class="item"><div class="check ${it.done?'on':''}" data-act="togDaily" data-id="${i}">${it.done?'✓':''}</div>
+   <div class="grow ${it.done?'done-t':''}" style="font-size:.88rem">${esc(it.t)}</div></div>`).join('')}
+  ${allClear?'<div class="gold" style="font-size:.8rem;margin-top:10px;font-weight:700">DAY CLEARED. That\'s how the 4-year plan gets built.</div>':''}
+ </div>
  <div class="card">
-  <div class="inline" style="margin-top:0"><input id="todoIn" placeholder="Add a task for today…"><button class="btn" data-act="addTodo">Add</button></div>
+  <div class="inline" style="margin-top:0"><input id="todoIn" placeholder="Add a one-off task…"><button class="btn" data-act="addTodo">Add</button></div>
  </div>
  <h2>To do · ${open.length}</h2>
  <div class="card">
@@ -317,6 +347,8 @@ const ACT={
  delExp(id){S.spend=S.spend.filter(x=>x.id!==id);save();render()},
  addTodo(){const t=$('todoIn').value.trim();if(!t)return;
   S.todos.unshift({id:uid(),t,done:false,created:today()});save();render()},
+ togDaily(i){const it=S.daily.items[+i];if(!it)return;
+  it.done=!it.done;bumpStreak();save();render()},
  togTodo(id){const t=S.todos.find(x=>x.id===id);if(!t)return;
   t.done=!t.done;t.doneAt=t.done?today():null;save();render()},
  delTodo(id){S.todos=S.todos.filter(x=>x.id!==id);save();render()},
