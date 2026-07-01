@@ -104,9 +104,14 @@ const ROUTINE=['Sunday Review — 30 min. Money check, wins, pick Saturday\'s ON
 const DEFAULT={savings:[],spend:[],todos:[],notes:[],events:{},
   budget:{income:125000,cats:[{n:'Rent',p:0},{n:'Light',p:0},{n:'Water',p:0},{n:'Taxi',p:0},{n:'Internet',p:0},{n:'Subscriptions',p:0},{n:'Computer Loan',p:0},{n:'Food',p:0},{n:'Me Money',p:10000}]},seeded:0};
 const clone=o=>JSON.parse(JSON.stringify(o));
+// Sandboxed viewers (in-app previews) block localStorage — fall back to memory so the app still runs.
+let PERSIST=true,MEM=null;
+try{localStorage.setItem('__t','1');localStorage.removeItem('__t')}catch(e){PERSIST=false}
+const storeGet=()=>{try{return localStorage.getItem(K)}catch(e){return MEM}};
+const storeSet=v=>{try{localStorage.setItem(K,v)}catch(e){MEM=v}};
 let S=load();
-function load(){try{const s=JSON.parse(localStorage.getItem(K));return s?Object.assign({},clone(DEFAULT),s):clone(DEFAULT)}catch(e){return clone(DEFAULT)}}
-const save=()=>localStorage.setItem(K,JSON.stringify(S));
+function load(){try{const s=JSON.parse(storeGet());return s?Object.assign({},clone(DEFAULT),s):clone(DEFAULT)}catch(e){return clone(DEFAULT)}}
+const save=()=>storeSet(JSON.stringify(S));
 if(!S.seeded){if(!S.events[QUARTER.evolve])S.events[QUARTER.evolve]=[];S.events[QUARTER.evolve].push('EVOLVE SESSION — score the quarter, build Q4');S.seeded=1;save()}
 
 const $=id=>document.getElementById(id);
@@ -147,6 +152,7 @@ function home(){
  const open=S.todos.filter(t=>!t.done),doneToday=S.todos.filter(t=>t.done&&t.doneAt&&t.doneAt.startsWith(today())).length;
  const ev=(S.events[today()]||[]);
  $('view').innerHTML=`
+ ${PERSIST?'':`<div class="banner" style="border-color:#a83238"><b>PREVIEW MODE</b> — this viewer can't save your data. Open <a href="https://jmac17ba.github.io/lifepath/" target="_blank" style="color:var(--gold)">jmac17ba.github.io/lifepath</a> in your browser instead.</div>`}
  ${d===25?`<div class="banner"><b>PAYDAY RITUAL.</b> 1) Move savings FIRST · 2) Pay fixed bills · 3) Screenshot the balance · 4) 15-min month check.</div>`:''}
  <div class="card">
   <div class="row"><span class="tag">CUSHION</span><span class="faint" style="font-size:.72rem">${days} days to Sep 25</span></div>
